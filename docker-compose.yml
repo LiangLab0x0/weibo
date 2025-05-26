@@ -1,0 +1,122 @@
+version: '3.8'
+
+services:
+  # Redis服务
+  redis:
+    image: redis:7-alpine
+    container_name: weibo-redis
+    ports:
+      - "6379:6379"
+    volumes:
+      - redis_data:/data
+    command: redis-server --appendonly yes
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+    networks:
+      - weibo-network
+
+  # 后端API服务
+  backend:
+    build:
+      context: ./backend
+      dockerfile: Dockerfile
+    container_name: weibo-backend
+    ports:
+      - "8000:8000"
+    environment:
+      - REDIS_URL=redis://redis:6379/0
+      - DATABASE_URL=sqlite:///./weibo_manager.db
+      - DEEPSEEK_API_KEY=${DEEPSEEK_API_KEY:-sk-your-deepseek-api-key-here}
+      - DEEPSEEK_BASE_URL=${DEEPSEEK_BASE_URL:-https://api.deepseek.com}
+      - SECRET_KEY=${SECRET_KEY:-your-super-secret-key-change-this-in-production-12345}
+      - DEBUG=${DEBUG:-true}
+    volumes:
+      - backend_data:/app/data
+    depends_on:
+      redis:
+        condition: service_healthy
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:8000/health"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+    networks:
+      - weibo-network
+
+  # Celery Worker服务
+  celery_worker:
+    build:
+      context: ./backend
+      dockerfile: Dockerfile
+    container_name: weibo-celery-worker
+    command: celery -A app.core.celery_app worker --loglevel=info --queues=celery,analysis,deletion
+    environment:
+      - REDIS_URL=redis://redis:6379/0
+      - DATABASE_URL=sqlite:///./weibo_manager.db
+      - DEEPSEEK_API_KEY=${DEEPSEEK_API_KEY:-sk-your-deepseek-api-key-here}
+      - DEEPSEEK_BASE_URL=${DEEPSEEK_BASE_URL:-https://api.deepseek.com}
+      - SECRET_KEY=${SECRET_KEY:-your-super-secret-key-change-this-in-production-12345}
+    volumes:
+      - backend_data:/app/data
+    depends_on:
+      - redis
+      - backend
+    healthcheck:
+      test: ["CMD", "celery", "-A", "app.core.celery_app", "inspect", "ping"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+    networks:
+      - weibo-network
+
+  # Flower监控服务
+  flower:
+    build:
+      context: ./backend
+      dockerfile: Dockerfile
+    container_name: weibo-flower
+    command: celery -A app.core.celery_app flower --port=5555
+    ports:
+      - "5555:5555"
+    environment:
+      - REDIS_URL=redis://redis:6379/0
+      - CELERY_BROKER_URL=redis://redis:6379/0
+    depends_on:
+      redis:
+        condition: service_healthy
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:5555"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+    networks:
+      - weibo-network
+
+  # 前端服务
+  frontend:
+    build:
+      context: ./frontend
+      dockerfile: Dockerfile
+    container_name: weibo-frontend
+    ports:
+      - "3000:3000"
+    environment:
+      - NEXT_PUBLIC_API_URL=http://localhost:8000/api/v1
+      - NODE_ENV=production
+    depends_on:
+      - backend
+    networks:
+      - weibo-network
+
+volumes:
+  redis_data:
+    driver: local
+  backend_data:
+    driver: local
+
+networks:
+  weibo-network:
+    driver: bridge 

@@ -1,0 +1,34 @@
+{
+  "name": "weibo-manager-frontend",
+  "version": "1.0.0",
+  "description": "微博AI内容管理器前端",
+  "private": true,
+  "scripts": {
+    "dev": "next dev",
+    "build": "next build",
+    "start": "next start",
+    "lint": "next lint",
+    "type-check": "tsc --noEmit"
+  },
+  "dependencies": {
+    "@ant-design/icons": "5.2.6",
+    "@ant-design/nextjs-registry": "1.0.2",
+    "antd": "5.13.3",
+    "axios": "^1.9.0",
+    "dayjs": "1.11.10",
+    "next": "^14.2.29",
+    "react": "18.2.0",
+    "react-dom": "18.2.0"
+  },
+  "devDependencies": {
+    "@types/node": "20.10.5",
+    "@types/react": "18.2.45",
+    "@types/react-dom": "18.2.18",
+    "eslint": "8.56.0",
+    "eslint-config-next": "14.0.4",
+    "typescript": "5.3.3"
+  },
+  "engines": {
+    "node": ">=18.0.0"
+  }
+}
